@@ -1,0 +1,29 @@
+# Web Framework
+fastapi
+uvicorn
+python-multipart 
+
+# MongoDB
+motor
+beanie
+dnspython
+
+# Configuración
+pydantic-settings
+pydantic[email] 
+
+# Seguridad (Contraseñas y JWT)
+passlib
+bcrypt==4.0.1
+python-jose[cryptography]
+
+# Para procesar archivos Excel (lo necesitaremos más adelante)
+pandas
+openpyxl
+cloudinary
+pandas
+openpyxl
+fastapi-mail
+
+Pillow
+requests
