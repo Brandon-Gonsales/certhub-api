@@ -3,7 +3,7 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from app.core.database import init_db
-
+from fastapi.middleware.cors import CORSMiddleware
 # 1. Importa el router que acabamos de crear
 from app.api import user_api, auth_api, campaign_api, certificate_api
 @asynccontextmanager
@@ -19,6 +19,15 @@ app = FastAPI(
     description="API para crear y gestionar campañas de certificados.",
     version="0.1.0",
     lifespan=lifespan
+)
+
+origins = ["*"]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],  # Permite todos los métodos (GET, POST, etc.)
+    allow_headers=["*"],  # Permite todos los encabezados
 )
 
 # 2. Incluye el router en la aplicación, asignándole un prefijo y una etiqueta
