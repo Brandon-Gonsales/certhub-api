@@ -95,7 +95,7 @@ async def delete_one_campaign(
 
 
 
-@router.post(
+@router.patch(
     "/{campaign_id}/upload-template-and-config",
     response_model=CampaignDisplay,
     summary="Upload template image and update config in one request"
