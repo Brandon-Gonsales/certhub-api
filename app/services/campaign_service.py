@@ -50,36 +50,45 @@ async def create_campaign(campaign_data: CampaignCreate, current_user: User) -> 
                    f"Considera actualizar tu plan."
         )
     # --------------------------------------------------
-    # 1. Busca la tipografía por el nombre proporcionado
-    typography_name = campaign_data.config.typography_name
-    typography = await Typography.find_one(Typography.name == typography_name)
+    # 1. Busca una tipografía por defecto (la primera que encuentre)
+    # En el futuro, esto podría ser configurable por el sistema
+    typography = await Typography.find_one({})
     
     if not typography:
-        # Si no se encuentra, devuelve un error claro y descriptivo
+        # Si no hay ninguna tipografía en el sistema, no podemos crear la configuración por defecto
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"La tipografía llamada '{typography_name}' no fue encontrada."
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="No hay tipografías configuradas en el sistema. Contacte al administrador."
         )
 
-    # 2. Construye el objeto de configuración con el ID encontrado
-    config_with_id = Campaign.ConfigSettings(
-        name_pos_x=campaign_data.config.name_pos_x,
-        name_pos_y=campaign_data.config.name_pos_y,
-        name_font_size=campaign_data.config.name_font_size,
-        typography_id=typography.id, # <-- Usa el ID de la fuente encontrada
-        code_pos_x=campaign_data.config.code_pos_x,
-        code_pos_y=campaign_data.config.code_pos_y
+    # 2. Construye el objeto de configuración por DEFECTO
+    default_config = Campaign.ConfigSettings(
+        name_pos_x=100, # Valores por defecto arbitrarios, ajustables luego
+        name_pos_y=100,
+        name_font_size=20,
+        name_color="#000000",
+        typography_id=typography.id,
+        code_pos_x=100,
+        code_pos_y=150,
+        code_font_size=12,
+        code_color="#000000"
     )
 
-    # 3. Crea la instancia del modelo Campaign
+    # 3. Construye el objeto de email por DEFECTO
+    default_email = Campaign.EmailSettings(
+        subject="Tu Certificado",
+        body="Hola, adjunto encontrarás tu certificado."
+    )
+
+    # 4. Crea la instancia del modelo Campaign
     campaign = Campaign(
         user_id=current_user.id,
         name=campaign_data.name,
-        config=config_with_id, # <-- Usa la config con el ID
-        email=campaign_data.email
+        config=default_config,
+        email=default_email
     )
 
-    # 4. Guarda la nueva campaña en la base de datos
+    # 5. Guarda la nueva campaña en la base de datos
     await campaign.create()
     
     return campaign

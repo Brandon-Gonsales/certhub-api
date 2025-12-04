@@ -35,10 +35,12 @@ class Campaign(Document):
         name_pos_x: int
         name_pos_y: int
         name_font_size: int
-        typography_id: PydanticObjectId
+        name_color: str       
         code_pos_x: Optional[int] = None
         code_pos_y: Optional[int] = None
-
+        code_font_size: Optional[int] = None
+        code_color: Optional[str] = None 
+        typography_id: PydanticObjectId
     class EmailSettings(BaseModel):
         subject: str
         body: str
