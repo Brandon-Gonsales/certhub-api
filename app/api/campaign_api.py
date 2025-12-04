@@ -93,24 +93,7 @@ async def delete_one_campaign(
     # Devolvemos una respuesta sin contenido, que es el estándar para DELETE exitosos.
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
-@router.post(
-    "/{campaign_id}/upload-template",
-    response_model=CampaignDisplay,
-    summary="Upload a certificate template image"
-)
-async def upload_campaign_template(
-    campaign_id: PydanticObjectId,
-    current_user: User = Depends(get_current_user),
-    file: UploadFile = File(...)
-):
-    """
-    Endpoint para subir la imagen de plantilla de un certificado.
-    
-    Debes enviar el archivo como 'form-data'.
-    """
-    return await campaign_service.upload_template_image(
-        campaign_id=campaign_id, file=file, current_user=current_user
-    )
+
 
 @router.post(
     "/{campaign_id}/upload-template-and-config",

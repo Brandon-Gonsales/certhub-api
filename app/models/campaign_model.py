@@ -35,7 +35,7 @@ class Campaign(Document):
         name_pos_x: int
         name_pos_y: int
         name_font_size: int
-        name_color: str       
+        name_color: str = "#000000"  # Valor por defecto para compatibilidad con datos antiguos
         code_pos_x: Optional[int] = None
         code_pos_y: Optional[int] = None
         code_font_size: Optional[int] = None
