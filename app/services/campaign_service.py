@@ -1,7 +1,7 @@
 # app/services/campaign_service.py
-from fastapi import HTTPException, status, UploadFile, BackgroundTasks
+from fastapi import HTTPException, status, UploadFile, BackgroundTasks, Form
 from beanie import PydanticObjectId
-from typing import List
+from typing import List, Optional
 import cloudinary
 import cloudinary.uploader
 
@@ -17,6 +17,7 @@ from app.services import email_service
 import pandas as pd
 import secrets
 import io
+import json
 
 cloudinary.config(
     cloud_name=settings.CLOUDINARY_CLOUD_NAME,
@@ -186,6 +187,51 @@ async def upload_template_image(
     
     # Actualizamos el campo en nuestro documento de campaña
     campaign.template_image_url = secure_url
+    await campaign.save()
+
+    return campaign
+
+
+async def upload_template_and_update_config(
+    campaign_id: PydanticObjectId,
+    file: UploadFile,
+    config_json: str,
+    current_user: User
+) -> Campaign:
+    """
+    Servicio para subir una imagen de plantilla Y actualizar la configuración
+    de la campaña en una sola operación.
+    """
+    # 1. Obtener la campaña y verificar la propiedad
+    campaign = await get_campaign_by_id(campaign_id, current_user)
+
+    # 2. Parsear la configuración desde JSON
+    try:
+        config_dict = json.loads(config_json)
+        config = Campaign.ConfigSettings(**config_dict)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Error al procesar la configuración: {str(e)}"
+        )
+
+    # 3. Subir el archivo a Cloudinary
+    upload_result = cloudinary.uploader.upload(
+        file.file, folder="certificate_templates"
+    )
+
+    # 4. Obtener la URL segura del resultado
+    secure_url = upload_result.get("secure_url")
+    if not secure_url:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="No se pudo subir la imagen a Cloudinary."
+        )
+    
+    # 5. Actualizar tanto la URL de la imagen como la configuración
+    campaign.template_image_url = secure_url
+    campaign.config = config
+    campaign.updated_at = datetime.utcnow()
     await campaign.save()
 
     return campaign
