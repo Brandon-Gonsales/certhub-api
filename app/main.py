@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from app.core.database import init_db
 from fastapi.middleware.cors import CORSMiddleware
 # 1. Importa el router que acabamos de crear
-from app.api import user_api, auth_api, campaign_api, certificate_api
+from app.api import user_api, auth_api, campaign_api, certificate_api, typography_api
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("Iniciando aplicación...")
@@ -35,6 +35,7 @@ app.include_router(user_api.router, prefix="/users", tags=["Users"])
 app.include_router(auth_api.router, prefix="/auth", tags=["Authentication"])
 app.include_router(campaign_api.router, prefix="/campaigns", tags=["Campaigns"])
 app.include_router(certificate_api.router, prefix="/certificates", tags=["Certificates"])
+app.include_router(typography_api.router, prefix="/typographies", tags=["Typographies"])
 
 @app.get("/", tags=["Health Check"])
 def read_root():
