@@ -30,6 +30,23 @@ class CampaignCreate(BaseModel):
     name: str
 
 
+# --- Esquema para actualizar configuración con nombre de tipografía ---
+class ConfigUpdateWithTypographyName(BaseModel):
+    """
+    Esquema para actualizar la configuración usando el nombre de la tipografía
+    en lugar del ID. Ideal para frontends que no manejan IDs.
+    """
+    name_pos_x: int
+    name_pos_y: int
+    name_font_size: int
+    name_color: str = "#000000"
+    code_pos_x: Optional[int] = None
+    code_pos_y: Optional[int] = None
+    code_font_size: Optional[int] = None
+    code_color: Optional[str] = None 
+    typography_name: str  # Nombre de la tipografía en lugar del ID
+
+
 # --- Esquema para MOSTRAR una Campaña (CON id) ---
 class CampaignDisplay(BaseModel):
     """

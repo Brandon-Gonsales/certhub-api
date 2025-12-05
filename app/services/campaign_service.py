@@ -208,7 +208,26 @@ async def upload_template_and_update_config(
     # 2. Parsear la configuración desde JSON
     try:
         config_dict = json.loads(config_json)
+        
+        # Verificar si viene typography_name en lugar de typography_id
+        if 'typography_name' in config_dict:
+            typography_name = config_dict.pop('typography_name')
+            
+            # Buscar la tipografía por nombre
+            typography = await Typography.find_one(Typography.name == typography_name)
+            if not typography:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"La tipografía '{typography_name}' no fue encontrada."
+                )
+            
+            # Reemplazar el nombre con el ID
+            config_dict['typography_id'] = typography.id
+        
+        # Crear el objeto ConfigSettings con el ID de la tipografía
         config = Campaign.ConfigSettings(**config_dict)
+    except HTTPException:
+        raise  # Re-lanzar excepciones HTTP
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

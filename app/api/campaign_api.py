@@ -114,7 +114,7 @@ async def upload_template_and_config(
     - file: La imagen de plantilla (form-data)
     - config: La configuración en formato JSON string (form-data)
     
-    Ejemplo de config JSON:
+    Ejemplo de config JSON (usando typography_name):
     {
         "name_pos_x": 100,
         "name_pos_y": 200,
@@ -124,8 +124,11 @@ async def upload_template_and_config(
         "code_pos_y": 250,
         "code_font_size": 14,
         "code_color": "#CCCCCC",
-        "typography_id": "507f1f77bcf86cd799439011"
+        "typography_name": "Roboto"
     }
+    
+    NOTA: Puedes usar "typography_name" (nombre de la tipografía) 
+    en lugar de "typography_id" para mayor facilidad desde el frontend.
     """
     return await campaign_service.upload_template_and_update_config(
         campaign_id=campaign_id,
