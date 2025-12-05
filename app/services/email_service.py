@@ -6,24 +6,32 @@ import asyncio
 from app.core.config import settings
 from app.models.campaign_model import Campaign
 
-# Configuración de la conexión con los datos de nuestro .env
-conf = ConnectionConfig(
-    MAIL_USERNAME=settings.MAIL_USERNAME,
-    MAIL_PASSWORD=settings.MAIL_PASSWORD,
-    MAIL_FROM=settings.MAIL_FROM,
-    MAIL_PORT=settings.MAIL_PORT,
-    MAIL_SERVER=settings.MAIL_SERVER,
-    MAIL_STARTTLS=settings.MAIL_STARTTLS,
-    MAIL_SSL_TLS=settings.MAIL_SSL_TLS,
-    USE_CREDENTIALS=True,
-    VALIDATE_CERTS=True
-)
-
 async def send_emails_in_background(campaign: Campaign):
     """
     Función que se ejecuta en segundo plano para enviar los correos.
     """
     print(f"--- INICIANDO ENVÍO DE CORREOS PARA CAMPAÑA: {campaign.name} ---")
+    
+    # Configuración de la conexión DENTRO de la función
+    # Esto asegura que siempre use los valores más recientes
+    conf = ConnectionConfig(
+        MAIL_USERNAME=settings.MAIL_USERNAME,
+        MAIL_PASSWORD=settings.MAIL_PASSWORD,
+        MAIL_FROM=settings.MAIL_FROM,
+        MAIL_PORT=settings.MAIL_PORT,
+        MAIL_SERVER=settings.MAIL_SERVER,
+        MAIL_STARTTLS=settings.MAIL_STARTTLS,
+        MAIL_SSL_TLS=settings.MAIL_SSL_TLS,
+        USE_CREDENTIALS=True,
+        VALIDATE_CERTS=True
+    )
+    
+    # Debug: Imprime la configuración para verificar
+    print(f"DEBUG - MAIL_SERVER: {settings.MAIL_SERVER}")
+    print(f"DEBUG - MAIL_PORT: {settings.MAIL_PORT}")
+    print(f"DEBUG - MAIL_FROM: {settings.MAIL_FROM}")
+    print(f"DEBUG - MAIL_USERNAME: {settings.MAIL_USERNAME}")
+    print(f"DEBUG - MAIL_STARTTLS: {settings.MAIL_STARTTLS}")
     
     # URL a la que el estudiante irá para reclamar su certificado
     claim_url = f"{settings.FRONTEND_URL}/claim-certificate"
