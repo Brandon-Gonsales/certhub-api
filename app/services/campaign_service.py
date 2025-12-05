@@ -256,6 +256,78 @@ async def upload_template_and_update_config(
     return campaign
 
 
+async def upload_template_and_update_config_formdata(
+    campaign_id: PydanticObjectId,
+    file: UploadFile,
+    name_pos_x: int,
+    name_pos_y: int,
+    name_font_size: int,
+    name_color: str,
+    typography_id: str,
+    code_pos_x: Optional[int],
+    code_pos_y: Optional[int],
+    code_font_size: Optional[int],
+    code_color: Optional[str],
+    current_user: User
+) -> Campaign:
+    """
+    Servicio para subir una imagen de plantilla Y actualizar la configuración
+    de la campaña usando campos individuales de FormData.
+    Acepta el ID de la tipografía directamente.
+    """
+    # 1. Obtener la campaña y verificar la propiedad
+    campaign = await get_campaign_by_id(campaign_id, current_user)
+
+    # 2. Convertir typography_id de string a PydanticObjectId
+    try:
+        typography_obj_id = PydanticObjectId(typography_id)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="El typography_id proporcionado no es válido."
+        )
+
+    # 3. Crear el objeto ConfigSettings
+    try:
+        config = Campaign.ConfigSettings(
+            name_pos_x=name_pos_x,
+            name_pos_y=name_pos_y,
+            name_font_size=name_font_size,
+            name_color=name_color,
+            typography_id=typography_obj_id,
+            code_pos_x=code_pos_x,
+            code_pos_y=code_pos_y,
+            code_font_size=code_font_size,
+            code_color=code_color
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Error al procesar la configuración: {str(e)}"
+        )
+
+    # 4. Subir el archivo a Cloudinary
+    upload_result = cloudinary.uploader.upload(
+        file.file, folder="certificate_templates"
+    )
+
+    # 5. Obtener la URL segura del resultado
+    secure_url = upload_result.get("secure_url")
+    if not secure_url:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="No se pudo subir la imagen a Cloudinary."
+        )
+    
+    # 6. Actualizar tanto la URL de la imagen como la configuración
+    campaign.template_image_url = secure_url
+    campaign.config = config
+    campaign.updated_at = datetime.utcnow()
+    await campaign.save()
+
+    return campaign
+
+
 async def process_recipients_file(
     campaign_id: PydanticObjectId,
     file: UploadFile,

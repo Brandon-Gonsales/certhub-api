@@ -104,36 +104,44 @@ async def upload_template_and_config(
     campaign_id: PydanticObjectId,
     current_user: User = Depends(get_current_user),
     file: UploadFile = File(...),
-    config: str = Form(...)
+    name_pos_x: int = Form(...),
+    name_pos_y: int = Form(...),
+    name_font_size: int = Form(...),
+    name_color: str = Form("#000000"),
+    typography_id: str = Form(...),
+    code_pos_x: int = Form(None),
+    code_pos_y: int = Form(None),
+    code_font_size: int = Form(None),
+    code_color: str = Form(None)
 ):
     """
     Endpoint para subir la imagen de plantilla Y actualizar la configuración
-    de la campaña en una sola operación.
+    de la campaña en una sola operación usando FormData.
     
-    Debes enviar:
-    - file: La imagen de plantilla (form-data)
-    - config: La configuración en formato JSON string (form-data)
-    
-    Ejemplo de config JSON (usando typography_name):
-    {
-        "name_pos_x": 100,
-        "name_pos_y": 200,
-        "name_font_size": 24,
-        "name_color": "#FFFFFF",
-        "code_pos_x": 100,
-        "code_pos_y": 250,
-        "code_font_size": 14,
-        "code_color": "#CCCCCC",
-        "typography_name": "Roboto"
-    }
-    
-    NOTA: Puedes usar "typography_name" (nombre de la tipografía) 
-    en lugar de "typography_id" para mayor facilidad desde el frontend.
+    Debes enviar todos los campos como form-data:
+    - file: La imagen de plantilla (archivo)
+    - name_pos_x: Posición X del nombre (int)
+    - name_pos_y: Posición Y del nombre (int)
+    - name_font_size: Tamaño de fuente del nombre (int)
+    - name_color: Color del nombre (string, ej: "#FFFFFF")
+    - typography_id: ID de la tipografía (string)
+    - code_pos_x: Posición X del código (int, opcional)
+    - code_pos_y: Posición Y del código (int, opcional)
+    - code_font_size: Tamaño de fuente del código (int, opcional)
+    - code_color: Color del código (string, opcional)
     """
-    return await campaign_service.upload_template_and_update_config(
+    return await campaign_service.upload_template_and_update_config_formdata(
         campaign_id=campaign_id,
         file=file,
-        config_json=config,
+        name_pos_x=name_pos_x,
+        name_pos_y=name_pos_y,
+        name_font_size=name_font_size,
+        name_color=name_color,
+        typography_id=typography_id,
+        code_pos_x=code_pos_x,
+        code_pos_y=code_pos_y,
+        code_font_size=code_font_size,
+        code_color=code_color,
         current_user=current_user
     )
 
