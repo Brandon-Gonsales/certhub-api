@@ -61,6 +61,28 @@ async def get_one_campaign(
     return await campaign_service.get_campaign_by_id(campaign_id, current_user)
 
 @router.patch(
+    "/{campaign_id}/name",
+    response_model=CampaignDisplay,
+    summary="Update campaign name"
+)
+async def update_campaign_name(
+    campaign_id: PydanticObjectId,
+    name: str = Form(...),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Endpoint para actualizar solo el nombre de una campaña.
+    
+    Campos requeridos (FormData):
+    - name: Nuevo nombre de la campaña (string, requerido)
+    """
+    return await campaign_service.update_campaign_name(
+        campaign_id=campaign_id,
+        name=name,
+        current_user=current_user
+    )
+
+@router.patch(
     "/{campaign_id}",
     response_model=CampaignDisplay,
     summary="Update campaign configuration, email, template and recipients"

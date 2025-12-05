@@ -1,6 +1,7 @@
 # app/services/certificate_service.py
 
 from fastapi import HTTPException, status
+from fastapi.responses import StreamingResponse
 from PIL import Image, ImageDraw, ImageFont
 import requests
 import io
@@ -11,12 +12,12 @@ from datetime import datetime
 from app.models.campaign_model import Campaign
 from app.models.typography_model import Typography
 
-async def generate_certificate_for_code(unique_code: str) -> dict:
+async def generate_certificate_for_code(unique_code: str) -> StreamingResponse:
     """
     Servicio principal para generar un certificado a partir de un código único.
+    Devuelve el certificado como archivo para descarga directa.
     """
     # 1. Busca la campaña que contiene al destinatario con este código.
-    # Esta es una consulta muy eficiente gracias al índice que creamos.
     campaign = await Campaign.find_one({"recipients.unique_code": unique_code})
     
     if not campaign:
@@ -24,31 +25,30 @@ async def generate_certificate_for_code(unique_code: str) -> dict:
 
     # 2. Encuentra al destinatario específico dentro de la lista de la campaña.
     recipient = next((r for r in campaign.recipients if r.unique_code == unique_code), None)
-    if not recipient: # Doble chequeo, aunque la consulta anterior debería garantizarlo
+    if not recipient:
         raise HTTPException(status_code=404, detail="Código de certificado no válido.")
 
-    # 3. Si el certificado ya fue generado, devuelve la URL existente para ahorrar recursos.
-    if recipient.certificate_url:
-        return {"certificate_url": recipient.certificate_url}
-
-    # 4. Reúne todos los ingredientes necesarios
+    # 3. Reúne todos los ingredientes necesarios
     student_name = recipient.name
     template_url = campaign.template_image_url
-    font_id = campaign.config.typography_id
+    config = campaign.config
 
     if not template_url:
         raise HTTPException(status_code=500, detail="La campaña no tiene una plantilla de imagen configurada.")
+    
+    if not config:
+        raise HTTPException(status_code=500, detail="La campaña no tiene configuración.")
         
-    typography = await Typography.get(font_id)
+    typography = await Typography.get(config.typography_id)
     if not typography:
         raise HTTPException(status_code=500, detail="La fuente configurada para esta campaña no fue encontrada.")
     font_url = typography.font_file_url
 
-    # 5. Proceso de Generación de Imagen en Memoria
+    # 4. Proceso de Generación de Imagen en Memoria
     try:
         # Descarga la plantilla y la fuente
         template_response = requests.get(template_url)
-        template_response.raise_for_status() # Lanza un error si la descarga falla
+        template_response.raise_for_status()
         font_response = requests.get(font_url)
         font_response.raise_for_status()
 
@@ -58,24 +58,31 @@ async def generate_certificate_for_code(unique_code: str) -> dict:
         
         # Prepara para dibujar
         draw = ImageDraw.Draw(template_image)
-        font = ImageFont.truetype(font_bytes, campaign.config.name_font_size)
         
-        # Dibuja el nombre del estudiante
+        # Dibuja el nombre del estudiante usando la configuración
+        name_font = ImageFont.truetype(font_bytes, config.name_font_size)
         draw.text(
-            (campaign.config.name_pos_x, campaign.config.name_pos_y),
+            (config.name_pos_x, config.name_pos_y),
             student_name,
-            font=font,
-            fill="black" # Puedes hacer esto configurable en el futuro
+            font=name_font,
+            fill=config.name_color  # Usa el color de la configuración
         )
-        # Dibuja el código único (opcional)
-        if campaign.config.code_pos_x is not None and campaign.config.code_pos_y is not None:
-            # Usamos una fuente más pequeña por defecto para el código
-            code_font = ImageFont.truetype(io.BytesIO(font_response.content), 30) 
+        
+        # Dibuja el código único si está configurado
+        if config.code_pos_x is not None and config.code_pos_y is not None:
+            # Usa el tamaño y color de fuente configurados para el código
+            code_font_size = config.code_font_size if config.code_font_size else 30
+            code_color = config.code_color if config.code_color else "#000000"
+            
+            # Necesitamos recargar el font_bytes porque truetype lo consume
+            font_bytes.seek(0)
+            code_font = ImageFont.truetype(font_bytes, code_font_size)
+            
             draw.text(
-                (campaign.config.code_pos_x, campaign.config.code_pos_y),
+                (config.code_pos_x, config.code_pos_y),
                 unique_code,
                 font=code_font,
-                fill="black"
+                fill=code_color
             )
         
         # Guarda la imagen final en un buffer de memoria, en formato PNG
@@ -86,15 +93,34 @@ async def generate_certificate_for_code(unique_code: str) -> dict:
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error durante la generación de la imagen: {e}")
 
-    # 6. Sube el certificado generado a Cloudinary
-    upload_result = cloudinary.uploader.upload(
-        final_image_buffer, folder="generated_certificates"
+    # 5. Sube el certificado generado a Cloudinary (opcional, para respaldo)
+    try:
+        # Necesitamos hacer una copia del buffer porque upload lo consume
+        buffer_copy = io.BytesIO(final_image_buffer.getvalue())
+        upload_result = cloudinary.uploader.upload(
+            buffer_copy, 
+            folder=f"certhub-api/generated_certificates/{campaign.id}"
+        )
+        certificate_url = upload_result.get("secure_url")
+        
+        # Actualiza el documento del destinatario con la URL y fecha
+        recipient.certificate_url = certificate_url
+        recipient.claimed_at = datetime.utcnow()
+        await campaign.save()
+    except Exception as e:
+        # Si falla la subida a Cloudinary, continuamos igual
+        print(f"Error al subir a Cloudinary: {e}")
+
+    # 6. Devuelve el certificado como archivo para descarga directa
+    final_image_buffer.seek(0)
+    
+    # Nombre del archivo para descarga
+    filename = f"certificado_{student_name.replace(' ', '_')}_{unique_code}.png"
+    
+    return StreamingResponse(
+        final_image_buffer,
+        media_type="image/png",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"'
+        }
     )
-    certificate_url = upload_result.get("secure_url")
-
-    # 7. Actualiza el documento del destinatario en la base de datos con la nueva URL
-    recipient.certificate_url = certificate_url
-    recipient.claimed_at = datetime.utcnow()
-    await campaign.save()
-
-    return {"certificate_url": certificate_url}

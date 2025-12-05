@@ -135,6 +135,27 @@ async def delete_campaign(campaign_id: PydanticObjectId, current_user: User):
     # No es necesario devolver nada, el éxito se comunica con el código de estado HTTP.
     return
 
+async def update_campaign_name(
+    campaign_id: PydanticObjectId,
+    name: str,
+    current_user: User
+) -> Campaign:
+    """
+    Servicio para actualizar solo el nombre de una campaña.
+    """
+    # 1. Obtener la campaña y verificar propiedad
+    campaign = await get_campaign_by_id(campaign_id, current_user)
+    
+    # 2. Actualizar el nombre
+    campaign.name = name
+    campaign.updated_at = datetime.utcnow()
+    
+    # 3. Guardar cambios
+    await campaign.save()
+    
+    return campaign
+
+
 async def upload_template_and_update_config_formdata(
     campaign_id: PydanticObjectId,
     file: UploadFile,
