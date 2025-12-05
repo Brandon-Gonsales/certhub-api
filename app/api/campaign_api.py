@@ -2,9 +2,9 @@
 
 from fastapi import APIRouter, Depends, status, Response, UploadFile, File, BackgroundTasks, Form
 from beanie import PydanticObjectId
-from typing import List 
+from typing import List
 
-from app.schemas.campaign_schema import CampaignCreate, CampaignDisplay, CampaignUpdate
+from app.schemas.campaign_schema import CampaignCreate, CampaignDisplay
 from app.services import campaign_service
 from app.core.security import get_current_user
 from app.models.user_model import User
@@ -63,18 +63,85 @@ async def get_one_campaign(
 @router.patch(
     "/{campaign_id}",
     response_model=CampaignDisplay,
-    summary="Update a campaign partially"
+    summary="Update campaign configuration, email, template and recipients"
 )
-async def update_one_campaign(
+async def update_campaign_config(
     campaign_id: PydanticObjectId,
-    update_data: CampaignUpdate,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    # Archivos
+    template_image: UploadFile = File(...),
+    recipients_file: UploadFile = File(None),
+    # Configuración (todos requeridos)
+    name_pos_x: int = Form(...),
+    name_pos_y: int = Form(...),
+    name_font_size: int = Form(...),
+    name_color: str = Form(...),
+    typography_id: str = Form(...),
+    code_pos_x: int = Form(None),
+    code_pos_y: int = Form(None),
+    code_font_size: int = Form(None),
+    code_color: str = Form(None),
+    # Email (todos requeridos)
+    email_subject: str = Form(...),
+    email_body: str = Form(...)
 ):
     """
-    Endpoint para actualizar parcialmente una campaña.
-    Puedes enviar solo los campos que deseas cambiar.
+    Endpoint para actualizar configuración, email, plantilla y destinatarios de una campaña.
+    
+    Usa las funciones existentes del servicio para manejar cada parte.
+    
+    Campos requeridos (FormData):
+    
+    **Archivos:**
+    - template_image: Imagen de plantilla del certificado (archivo, requerido)
+    - recipients_file: Archivo Excel con destinatarios (archivo, opcional)
+    
+    **Configuración del certificado:**
+    - name_pos_x: Posición X del nombre (int, requerido)
+    - name_pos_y: Posición Y del nombre (int, requerido)
+    - name_font_size: Tamaño de fuente del nombre (int, requerido)
+    - name_color: Color del nombre (string, requerido)
+    - typography_id: ID de la tipografía (string, requerido)
+    - code_pos_x: Posición X del código (int, opcional)
+    - code_pos_y: Posición Y del código (int, opcional)
+    - code_font_size: Tamaño de fuente del código (int, opcional)
+    - code_color: Color del código (string, opcional)
+    
+    **Email:**
+    - email_subject: Asunto del email (string, requerido)
+    - email_body: Cuerpo del email (string, requerido)
     """
-    return await campaign_service.update_campaign(campaign_id, update_data, current_user)
+    # 1. Subir plantilla y actualizar configuración usando función existente
+    campaign = await campaign_service.upload_template_and_update_config_formdata(
+        campaign_id=campaign_id,
+        file=template_image,
+        name_pos_x=name_pos_x,
+        name_pos_y=name_pos_y,
+        name_font_size=name_font_size,
+        name_color=name_color,
+        typography_id=typography_id,
+        code_pos_x=code_pos_x,
+        code_pos_y=code_pos_y,
+        code_font_size=code_font_size,
+        code_color=code_color,
+        current_user=current_user
+    )
+    
+    # 2. Actualizar email
+    from app.models.campaign_model import Campaign
+    email_settings = Campaign.EmailSettings(subject=email_subject, body=email_body)
+    campaign.email = email_settings
+    await campaign.save()
+    
+    # 3. Procesar archivo de destinatarios si se proporciona usando función existente
+    if recipients_file is not None:
+        campaign = await campaign_service.process_recipients_file(
+            campaign_id=campaign_id,
+            file=recipients_file,
+            current_user=current_user
+        )
+    
+    return campaign
 
 @router.delete(
     "/{campaign_id}",
@@ -92,77 +159,6 @@ async def delete_one_campaign(
     
     # Devolvemos una respuesta sin contenido, que es el estándar para DELETE exitosos.
     return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-
-
-@router.patch(
-    "/{campaign_id}/upload-template-and-config",
-    response_model=CampaignDisplay,
-    summary="Upload template image and update config in one request"
-)
-async def upload_template_and_config(
-    campaign_id: PydanticObjectId,
-    current_user: User = Depends(get_current_user),
-    file: UploadFile = File(...),
-    name_pos_x: int = Form(...),
-    name_pos_y: int = Form(...),
-    name_font_size: int = Form(...),
-    name_color: str = Form("#000000"),
-    typography_id: str = Form(...),
-    code_pos_x: int = Form(None),
-    code_pos_y: int = Form(None),
-    code_font_size: int = Form(None),
-    code_color: str = Form(None)
-):
-    """
-    Endpoint para subir la imagen de plantilla Y actualizar la configuración
-    de la campaña en una sola operación usando FormData.
-    
-    Debes enviar todos los campos como form-data:
-    - file: La imagen de plantilla (archivo)
-    - name_pos_x: Posición X del nombre (int)
-    - name_pos_y: Posición Y del nombre (int)
-    - name_font_size: Tamaño de fuente del nombre (int)
-    - name_color: Color del nombre (string, ej: "#FFFFFF")
-    - typography_id: ID de la tipografía (string)
-    - code_pos_x: Posición X del código (int, opcional)
-    - code_pos_y: Posición Y del código (int, opcional)
-    - code_font_size: Tamaño de fuente del código (int, opcional)
-    - code_color: Color del código (string, opcional)
-    """
-    return await campaign_service.upload_template_and_update_config_formdata(
-        campaign_id=campaign_id,
-        file=file,
-        name_pos_x=name_pos_x,
-        name_pos_y=name_pos_y,
-        name_font_size=name_font_size,
-        name_color=name_color,
-        typography_id=typography_id,
-        code_pos_x=code_pos_x,
-        code_pos_y=code_pos_y,
-        code_font_size=code_font_size,
-        code_color=code_color,
-        current_user=current_user
-    )
-
-@router.post(
-    "/{campaign_id}/upload-recipients",
-    response_model=CampaignDisplay,
-    summary="Upload and process the recipients Excel file"
-)
-async def upload_recipients(
-    campaign_id: PydanticObjectId,
-    current_user: User = Depends(get_current_user),
-    file: UploadFile = File(...)
-):
-    """
-    Endpoint para subir y procesar el archivo Excel con los destinatarios.
-    
-    El archivo debe contener las columnas 'nombre' y 'correo'.
-    """
-    return await campaign_service.process_recipients_file(
-        campaign_id=campaign_id, file=file, current_user=current_user
-    )
 
 @router.post(
     "/{campaign_id}/activate",

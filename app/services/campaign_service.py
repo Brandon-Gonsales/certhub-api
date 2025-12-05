@@ -9,7 +9,7 @@ from app.models.campaign_model import Campaign,Recipient
 from app.models.user_model import User
 from app.models.typography_model import Typography 
 from app.models.plan_model import Plan 
-from app.schemas.campaign_schema import CampaignCreate, CampaignUpdate
+from app.schemas.campaign_schema import CampaignCreate
 from datetime import datetime
 from app.core.config import settings
 from app.services import email_service
@@ -119,31 +119,7 @@ async def get_campaign_by_id(campaign_id: PydanticObjectId, current_user: User) 
     
     return campaign
 
-async def update_campaign(
-    campaign_id: PydanticObjectId,
-    update_data: CampaignUpdate,
-    current_user: User
-) -> Campaign:
-    """
-    Servicio para actualizar una campaña.
-    """
-    # 1. Reutilizamos nuestra función para obtener la campaña y verificar la propiedad
-    campaign = await get_campaign_by_id(campaign_id, current_user)
 
-    # 2. Convertimos el esquema de Pydantic a un diccionario, excluyendo los campos no establecidos
-    update_dict = update_data.model_dump(exclude_unset=True)
-
-    # 3. Iteramos sobre los datos a actualizar y los aplicamos al modelo
-    for key, value in update_dict.items():
-        setattr(campaign, key, value)
-    
-    # 4. Actualizamos la fecha de modificación
-    campaign.updated_at = datetime.utcnow()
-
-    # 5. Guardamos los cambios en la base de datos
-    await campaign.save()
-    
-    return campaign
 
 async def delete_campaign(campaign_id: PydanticObjectId, current_user: User):
     """
@@ -158,103 +134,6 @@ async def delete_campaign(campaign_id: PydanticObjectId, current_user: User):
     
     # No es necesario devolver nada, el éxito se comunica con el código de estado HTTP.
     return
-
-async def upload_template_image(
-    campaign_id: PydanticObjectId,
-    file: UploadFile,
-    current_user: User
-) -> Campaign:
-    """
-    Servicio para subir una imagen de plantilla, guardarla en Cloudinary
-    y actualizar la campaña correspondiente.
-    """
-    # Reutilizamos nuestra función para obtener la campaña y verificar la propiedad
-    campaign = await get_campaign_by_id(campaign_id, current_user)
-
-    # Sube el archivo a Cloudinary
-    # Usamos una carpeta para mantener los templates organizados
-    upload_result = cloudinary.uploader.upload(
-        file.file, folder="certificate_templates"
-    )
-
-    # Obtenemos la URL segura del resultado
-    secure_url = upload_result.get("secure_url")
-    if not secure_url:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="No se pudo subir la imagen a Cloudinary."
-        )
-    
-    # Actualizamos el campo en nuestro documento de campaña
-    campaign.template_image_url = secure_url
-    await campaign.save()
-
-    return campaign
-
-
-async def upload_template_and_update_config(
-    campaign_id: PydanticObjectId,
-    file: UploadFile,
-    config_json: str,
-    current_user: User
-) -> Campaign:
-    """
-    Servicio para subir una imagen de plantilla Y actualizar la configuración
-    de la campaña en una sola operación.
-    """
-    # 1. Obtener la campaña y verificar la propiedad
-    campaign = await get_campaign_by_id(campaign_id, current_user)
-
-    # 2. Parsear la configuración desde JSON
-    try:
-        config_dict = json.loads(config_json)
-        
-        # Verificar si viene typography_name en lugar de typography_id
-        if 'typography_name' in config_dict:
-            typography_name = config_dict.pop('typography_name')
-            
-            # Buscar la tipografía por nombre
-            typography = await Typography.find_one(Typography.name == typography_name)
-            if not typography:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"La tipografía '{typography_name}' no fue encontrada."
-                )
-            
-            # Reemplazar el nombre con el ID
-            config_dict['typography_id'] = typography.id
-        
-        # Crear el objeto ConfigSettings con el ID de la tipografía
-        config = Campaign.ConfigSettings(**config_dict)
-    except HTTPException:
-        raise  # Re-lanzar excepciones HTTP
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Error al procesar la configuración: {str(e)}"
-        )
-
-    # 3. Subir el archivo a Cloudinary
-    upload_result = cloudinary.uploader.upload(
-        file.file, folder="certificate_templates"
-    )
-
-    # 4. Obtener la URL segura del resultado
-    secure_url = upload_result.get("secure_url")
-    if not secure_url:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="No se pudo subir la imagen a Cloudinary."
-        )
-    
-    # 5. Actualizar tanto la URL de la imagen como la configuración
-    campaign.template_image_url = secure_url
-    campaign.config = config
-    campaign.updated_at = datetime.utcnow()
-    await campaign.save()
-
-    return campaign
-
 
 async def upload_template_and_update_config_formdata(
     campaign_id: PydanticObjectId,
@@ -308,7 +187,7 @@ async def upload_template_and_update_config_formdata(
 
     # 4. Subir el archivo a Cloudinary
     upload_result = cloudinary.uploader.upload(
-        file.file, folder="certificate_templates"
+        file.file, folder="certhub-api/{current_user.id}/{campaign_id}/certificate_templates"
     )
 
     # 5. Obtener la URL segura del resultado
@@ -393,7 +272,7 @@ async def process_recipients_file(
     # 6. Sube el archivo original a Cloudinary para tener un respaldo
     upload_result = cloudinary.uploader.upload(
         contents,
-        folder="recipient_files",
+        folder="certhub-api/{current_user.id}/{campaign_id}/recipient_files",
         resource_type="raw" # Importante para archivos no-media como Excel
     )
     
