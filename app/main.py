@@ -1,5 +1,3 @@
-# app/main.py
-
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from app.core.database import init_db

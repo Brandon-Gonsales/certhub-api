@@ -19,14 +19,9 @@ class Settings(BaseSettings):
     CLOUDINARY_API_KEY: str
     CLOUDINARY_API_SECRET: str
 
-    # Email settings - AÑADE ESTAS LÍNEAS
-    MAIL_USERNAME: str
-    MAIL_PASSWORD: str
+    # Email settings
     MAIL_FROM: str
-    MAIL_SERVER: str
-    MAIL_PORT: int
-    MAIL_STARTTLS: bool
-    MAIL_SSL_TLS: bool
+    SENDGRID_API_KEY: str
 
     # Frontend URL - AÑADE ESTA LÍNEA
     FRONTEND_URL: str
