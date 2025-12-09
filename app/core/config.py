@@ -1,6 +1,7 @@
 # app/core/config.py
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import field_validator
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
@@ -25,5 +26,11 @@ class Settings(BaseSettings):
 
     # Frontend URL - AÑADE ESTA LÍNEA
     FRONTEND_URL: str
+
+    @field_validator("SENDGRID_API_KEY")
+    @classmethod
+    def clean_api_key(cls, v):
+        return v.strip() if v else v
+
 
 settings = Settings()
